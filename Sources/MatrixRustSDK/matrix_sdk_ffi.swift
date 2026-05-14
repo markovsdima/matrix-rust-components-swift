@@ -8909,6 +8909,19 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func sendRaw(eventType: String, content: String) async throws 
     
     /**
+     * Send a raw event to the room with a caller-provided transaction ID.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as JSON string.
+     *
+     * * `transaction_id` - The transaction ID to use for the event.
+     */
+    func sendRawWithTransactionId(eventType: String, content: String, transactionId: String) async throws 
+    
+    /**
      * Send a raw state event to the room.
      *
      * # Arguments
@@ -10418,6 +10431,34 @@ open func sendRaw(eventType: String, content: String)async throws   {
                 uniffi_matrix_sdk_ffi_fn_method_room_send_raw(
                     self.uniffiCloneHandle(),
                     FfiConverterString.lower(eventType),FfiConverterString.lower(content)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Send a raw event to the room with a caller-provided transaction ID.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as JSON string.
+     *
+     * * `transaction_id` - The transaction ID to use for the event.
+     */
+open func sendRawWithTransactionId(eventType: String, content: String, transactionId: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_raw_with_transaction_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventType),FfiConverterString.lower(content),FfiConverterString.lower(transactionId)
                 )
             },
             pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
@@ -53740,6 +53781,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw() != 63831) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw_with_transaction_id() != 36361) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_state_event_raw() != 55730) {
