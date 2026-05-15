@@ -8922,6 +8922,20 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func sendRawWithTransactionId(eventType: String, content: String, transactionId: String) async throws 
     
     /**
+     * Send a raw event to the room with a caller-provided transaction ID,
+     * returning the event ID from the server response.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as JSON string.
+     *
+     * * `transaction_id` - The transaction ID to use for the event.
+     */
+    func sendRawWithTransactionIdReturningEventId(eventType: String, content: String, transactionId: String) async throws  -> String
+    
+    /**
      * Send a raw state event to the room.
      *
      * # Arguments
@@ -10465,6 +10479,35 @@ open func sendRawWithTransactionId(eventType: String, content: String, transacti
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Send a raw event to the room with a caller-provided transaction ID,
+     * returning the event ID from the server response.
+     *
+     * # Arguments
+     *
+     * * `event_type` - The type of the event to send.
+     *
+     * * `content` - The content of the event to send encoded as JSON string.
+     *
+     * * `transaction_id` - The transaction ID to use for the event.
+     */
+open func sendRawWithTransactionIdReturningEventId(eventType: String, content: String, transactionId: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_raw_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventType),FfiConverterString.lower(content),FfiConverterString.lower(transactionId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -53784,6 +53827,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw_with_transaction_id() != 36361) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw_with_transaction_id_returning_event_id() != 25387) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_state_event_raw() != 55730) {
