@@ -8958,6 +8958,13 @@ public protocol RoomProtocol: AnyObject, Sendable {
      */
     func sendUploadedImageWithTransactionIdReturningEventId(uploadedImageJson: String, transactionId: String, caption: String?, formattedCaption: String?, replyEventId: String?) async throws  -> String
     
+    /**
+     * Send a previously uploaded voice message as a typed `m.audio` voice
+     * event with a caller-provided transaction ID, returning the homeserver
+     * event ID.
+     */
+    func sendUploadedVoiceWithTransactionIdReturningEventId(uploadedVoiceJson: String, transactionId: String, replyEventId: String?) async throws  -> String
+    
     func setIsFavourite(isFavourite: Bool, tagOrder: Double?) async throws 
     
     func setIsLowPriority(isLowPriority: Bool, tagOrder: Double?) async throws 
@@ -9129,6 +9136,15 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * [`send_uploaded_image_with_transaction_id_returning_event_id`].
      */
     func uploadImageForEvent(originalFilePath: String, thumbnailFilePath: String?, originalMimetype: String, originalSize: UInt64, originalWidth: UInt64, originalHeight: UInt64, thumbnailMimetype: String?, thumbnailSize: UInt64?, thumbnailWidth: UInt64?, thumbnailHeight: UInt64?, blurhash: String?) async throws  -> String
+    
+    /**
+     * Upload a voice message for a later typed `m.audio` voice event.
+     *
+     * The returned JSON string is opaque to the caller and should be persisted
+     * as-is until it is passed to
+     * [`send_uploaded_voice_with_transaction_id_returning_event_id`].
+     */
+    func uploadVoiceForEvent(filePath: String, mimetype: String, size: UInt64, duration: TimeInterval, waveform: [Float]) async throws  -> String
     
     /**
      * Remove verification requirements for the given users and
@@ -10580,6 +10596,28 @@ open func sendUploadedImageWithTransactionIdReturningEventId(uploadedImageJson: 
         )
 }
     
+    /**
+     * Send a previously uploaded voice message as a typed `m.audio` voice
+     * event with a caller-provided transaction ID, returning the homeserver
+     * event ID.
+     */
+open func sendUploadedVoiceWithTransactionIdReturningEventId(uploadedVoiceJson: String, transactionId: String, replyEventId: String?)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_uploaded_voice_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(uploadedVoiceJson),FfiConverterString.lower(transactionId),FfiConverterOptionString.lower(replyEventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeUploadedVoiceError_lift
+        )
+}
+    
 open func setIsFavourite(isFavourite: Bool, tagOrder: Double?)async throws   {
     return
         try  await uniffiRustCallAsync(
@@ -11149,6 +11187,30 @@ open func uploadImageForEvent(originalFilePath: String, thumbnailFilePath: Strin
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeUploadedImageError_lift
+        )
+}
+    
+    /**
+     * Upload a voice message for a later typed `m.audio` voice event.
+     *
+     * The returned JSON string is opaque to the caller and should be persisted
+     * as-is until it is passed to
+     * [`send_uploaded_voice_with_transaction_id_returning_event_id`].
+     */
+open func uploadVoiceForEvent(filePath: String, mimetype: String, size: UInt64, duration: TimeInterval, waveform: [Float])async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_upload_voice_for_event(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(filePath),FfiConverterString.lower(mimetype),FfiConverterUInt64.lower(size),FfiConverterDuration.lower(duration),FfiConverterSequenceFloat.lower(waveform)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeUploadedVoiceError_lift
         )
 }
     
@@ -42459,6 +42521,94 @@ public func FfiConverterTypeUploadedImageError_lower(_ value: UploadedImageError
     return FfiConverterTypeUploadedImageError.lower(value)
 }
 
+
+public enum UploadedVoiceError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    case Validation(msg: String, details: String?
+    )
+    case Retryable(msg: String, details: String?
+    )
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension UploadedVoiceError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUploadedVoiceError: FfiConverterRustBuffer {
+    typealias SwiftType = UploadedVoiceError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UploadedVoiceError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .Validation(
+            msg: try FfiConverterString.read(from: &buf), 
+            details: try FfiConverterOptionString.read(from: &buf)
+            )
+        case 2: return .Retryable(
+            msg: try FfiConverterString.read(from: &buf), 
+            details: try FfiConverterOptionString.read(from: &buf)
+            )
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: UploadedVoiceError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case let .Validation(msg,details):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(msg, into: &buf)
+            FfiConverterOptionString.write(details, into: &buf)
+            
+        
+        case let .Retryable(msg,details):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(msg, into: &buf)
+            FfiConverterOptionString.write(details, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUploadedVoiceError_lift(_ buf: RustBuffer) throws -> UploadedVoiceError {
+    return try FfiConverterTypeUploadedVoiceError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUploadedVoiceError_lower(_ value: UploadedVoiceError) -> RustBuffer {
+    return FfiConverterTypeUploadedVoiceError.lower(value)
+}
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 
@@ -53986,6 +54136,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_uploaded_image_with_transaction_id_returning_event_id() != 51817) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_uploaded_voice_with_transaction_id_returning_event_id() != 1122) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_set_is_favourite() != 1289) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54074,6 +54227,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_image_for_event() != 12709) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_voice_for_event() != 35038) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 13926) {
