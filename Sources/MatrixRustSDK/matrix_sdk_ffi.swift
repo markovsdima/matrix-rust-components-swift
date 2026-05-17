@@ -8966,6 +8966,12 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func sendStateEventRaw(eventType: String, stateKey: String, content: String) async throws  -> String
     
     /**
+     * Send a previously uploaded file as a typed `m.file` event with a
+     * caller-provided transaction ID, returning the homeserver event ID.
+     */
+    func sendUploadedFileWithTransactionIdReturningEventId(uploadedFileJson: String, transactionId: String, caption: String?, formattedCaption: String?, replyEventId: String?) async throws  -> String
+    
+    /**
      * Send a previously uploaded image as a typed `m.image` event with a
      * caller-provided transaction ID, returning the homeserver event ID.
      */
@@ -9146,6 +9152,18 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * * `media_info` - The media info used as avatar image info.
      */
     func uploadAvatar(mimeType: String, data: Data, mediaInfo: ImageInfo?) async throws 
+    
+    /**
+     * Upload a file and optional thumbnail for a later typed `m.file` event.
+     *
+     * The returned JSON string is opaque to the caller and should be persisted
+     * as-is until it is passed to
+     * [`send_uploaded_file_with_transaction_id_returning_event_id`].
+     *
+     * If provided, `progress_watcher` reports progress for the original file
+     * upload. Thumbnail upload progress is intentionally omitted.
+     */
+    func uploadFileForEvent(filePath: String, thumbnailFilePath: String?, mimetype: String, size: UInt64, thumbnailMimetype: String?, thumbnailSize: UInt64?, thumbnailWidth: UInt64?, thumbnailHeight: UInt64?, progressWatcher: ProgressWatcher?) async throws  -> String
     
     /**
      * Upload an image and optional thumbnail for a later typed `m.image` event.
@@ -10635,6 +10653,27 @@ open func sendStateEventRaw(eventType: String, stateKey: String, content: String
 }
     
     /**
+     * Send a previously uploaded file as a typed `m.file` event with a
+     * caller-provided transaction ID, returning the homeserver event ID.
+     */
+open func sendUploadedFileWithTransactionIdReturningEventId(uploadedFileJson: String, transactionId: String, caption: String?, formattedCaption: String?, replyEventId: String?)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_uploaded_file_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(uploadedFileJson),FfiConverterString.lower(transactionId),FfiConverterOptionString.lower(caption),FfiConverterOptionString.lower(formattedCaption),FfiConverterOptionString.lower(replyEventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeUploadedFileError_lift
+        )
+}
+    
+    /**
      * Send a previously uploaded image as a typed `m.image` event with a
      * caller-provided transaction ID, returning the homeserver event ID.
      */
@@ -11243,6 +11282,33 @@ open func uploadAvatar(mimeType: String, data: Data, mediaInfo: ImageInfo?)async
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Upload a file and optional thumbnail for a later typed `m.file` event.
+     *
+     * The returned JSON string is opaque to the caller and should be persisted
+     * as-is until it is passed to
+     * [`send_uploaded_file_with_transaction_id_returning_event_id`].
+     *
+     * If provided, `progress_watcher` reports progress for the original file
+     * upload. Thumbnail upload progress is intentionally omitted.
+     */
+open func uploadFileForEvent(filePath: String, thumbnailFilePath: String?, mimetype: String, size: UInt64, thumbnailMimetype: String?, thumbnailSize: UInt64?, thumbnailWidth: UInt64?, thumbnailHeight: UInt64?, progressWatcher: ProgressWatcher?)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_upload_file_for_event(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(filePath),FfiConverterOptionString.lower(thumbnailFilePath),FfiConverterString.lower(mimetype),FfiConverterUInt64.lower(size),FfiConverterOptionString.lower(thumbnailMimetype),FfiConverterOptionUInt64.lower(thumbnailSize),FfiConverterOptionUInt64.lower(thumbnailWidth),FfiConverterOptionUInt64.lower(thumbnailHeight),FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeUploadedFileError_lift
         )
 }
     
@@ -42541,6 +42607,94 @@ public func FfiConverterTypeUploadSource_lower(_ value: UploadSource) -> RustBuf
 
 
 
+public enum UploadedFileError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    case Validation(msg: String, details: String?
+    )
+    case Retryable(msg: String, details: String?
+    )
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension UploadedFileError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUploadedFileError: FfiConverterRustBuffer {
+    typealias SwiftType = UploadedFileError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UploadedFileError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .Validation(
+            msg: try FfiConverterString.read(from: &buf), 
+            details: try FfiConverterOptionString.read(from: &buf)
+            )
+        case 2: return .Retryable(
+            msg: try FfiConverterString.read(from: &buf), 
+            details: try FfiConverterOptionString.read(from: &buf)
+            )
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: UploadedFileError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case let .Validation(msg,details):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(msg, into: &buf)
+            FfiConverterOptionString.write(details, into: &buf)
+            
+        
+        case let .Retryable(msg,details):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(msg, into: &buf)
+            FfiConverterOptionString.write(details, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUploadedFileError_lift(_ buf: RustBuffer) throws -> UploadedFileError {
+    return try FfiConverterTypeUploadedFileError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUploadedFileError_lower(_ value: UploadedFileError) -> RustBuffer {
+    return FfiConverterTypeUploadedFileError.lower(value)
+}
+
+
 public enum UploadedImageError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
     
@@ -54331,6 +54485,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_state_event_raw() != 55730) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_uploaded_file_with_transaction_id_returning_event_id() != 28489) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_uploaded_image_with_transaction_id_returning_event_id() != 51817) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54425,6 +54582,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_avatar() != 43932) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_file_for_event() != 42756) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_image_for_event() != 12709) {
