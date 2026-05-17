@@ -8828,10 +8828,23 @@ public protocol RoomProtocol: AnyObject, Sendable {
      *
      * * `event_id` - The ID of the event to redact
      *
-     * * `reason` - The reason for the event being redacted (optional). its
-     * transaction ID (optional). If not given one is created.
+     * * `reason` - The reason for the event being redacted (optional).
      */
     func redact(eventId: String, reason: String?) async throws 
+    
+    /**
+     * Redacts an event from the room with a caller-provided transaction ID,
+     * returning the homeserver event ID of the redaction event.
+     *
+     * # Arguments
+     *
+     * * `event_id` - The ID of the event to redact.
+     *
+     * * `reason` - The reason for the event being redacted (optional).
+     *
+     * * `transaction_id` - The transaction ID to use for the redaction event.
+     */
+    func redactWithTransactionIdReturningEventId(eventId: String, reason: String?, transactionId: String) async throws  -> String
     
     /**
      * Removes the current room avatar
@@ -10241,8 +10254,7 @@ open func rawName() -> String?  {
      *
      * * `event_id` - The ID of the event to redact
      *
-     * * `reason` - The reason for the event being redacted (optional). its
-     * transaction ID (optional). If not given one is created.
+     * * `reason` - The reason for the event being redacted (optional).
      */
 open func redact(eventId: String, reason: String?)async throws   {
     return
@@ -10257,6 +10269,35 @@ open func redact(eventId: String, reason: String?)async throws   {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Redacts an event from the room with a caller-provided transaction ID,
+     * returning the homeserver event ID of the redaction event.
+     *
+     * # Arguments
+     *
+     * * `event_id` - The ID of the event to redact.
+     *
+     * * `reason` - The reason for the event being redacted (optional).
+     *
+     * * `transaction_id` - The transaction ID to use for the redaction event.
+     */
+open func redactWithTransactionIdReturningEventId(eventId: String, reason: String?, transactionId: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_redact_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventId),FfiConverterOptionString.lower(reason),FfiConverterString.lower(transactionId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -54091,7 +54132,10 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_raw_name() != 65346) {
         return InitializationResult.apiChecksumMismatch
     }
-    if (uniffi_matrix_sdk_ffi_checksum_method_room_redact() != 56590) {
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_redact() != 63919) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_redact_with_transaction_id_returning_event_id() != 31134) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_remove_avatar() != 3551) {
