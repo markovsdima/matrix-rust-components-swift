@@ -8911,6 +8911,15 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func sendLiveLocation(geoUri: String) async throws 
     
     /**
+     * Send a typed `m.room.message` event with a caller-provided transaction ID,
+     * returning the event ID from the server response.
+     *
+     * This bypasses the SDK send queue/local echo path while still using Ruma
+     * typed message content built by the caller.
+     */
+    func sendMessageTypeWithTransactionIdReturningEventId(msgType: MessageType, transactionId: String, replyEventId: String?) async throws  -> String
+    
+    /**
      * Send a raw event to the room.
      *
      * # Arguments
@@ -10534,6 +10543,30 @@ open func sendLiveLocation(geoUri: String)async throws   {
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
             errorHandler: FfiConverterTypeLiveLocationError_lift
+        )
+}
+    
+    /**
+     * Send a typed `m.room.message` event with a caller-provided transaction ID,
+     * returning the event ID from the server response.
+     *
+     * This bypasses the SDK send queue/local echo path while still using Ruma
+     * typed message content built by the caller.
+     */
+open func sendMessageTypeWithTransactionIdReturningEventId(msgType: MessageType, transactionId: String, replyEventId: String?)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_message_type_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterTypeMessageType_lower(msgType),FfiConverterString.lower(transactionId),FfiConverterOptionString.lower(replyEventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError_lift
         )
 }
     
@@ -54471,6 +54504,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_live_location() != 42045) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_message_type_with_transaction_id_returning_event_id() != 51152) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_raw() != 63831) {
