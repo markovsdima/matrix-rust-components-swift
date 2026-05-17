@@ -8972,6 +8972,12 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func sendUploadedImageWithTransactionIdReturningEventId(uploadedImageJson: String, transactionId: String, caption: String?, formattedCaption: String?, replyEventId: String?) async throws  -> String
     
     /**
+     * Send a previously uploaded video as a typed `m.video` event with a
+     * caller-provided transaction ID, returning the homeserver event ID.
+     */
+    func sendUploadedVideoWithTransactionIdReturningEventId(uploadedVideoJson: String, transactionId: String, caption: String?, formattedCaption: String?, replyEventId: String?) async throws  -> String
+    
+    /**
      * Send a previously uploaded voice message as a typed `m.audio` voice
      * event with a caller-provided transaction ID, returning the homeserver
      * event ID.
@@ -9149,6 +9155,18 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * [`send_uploaded_image_with_transaction_id_returning_event_id`].
      */
     func uploadImageForEvent(originalFilePath: String, thumbnailFilePath: String?, originalMimetype: String, originalSize: UInt64, originalWidth: UInt64, originalHeight: UInt64, thumbnailMimetype: String?, thumbnailSize: UInt64?, thumbnailWidth: UInt64?, thumbnailHeight: UInt64?, blurhash: String?) async throws  -> String
+    
+    /**
+     * Upload a video and optional thumbnail for a later typed `m.video` event.
+     *
+     * The returned JSON string is opaque to the caller and should be persisted
+     * as-is until it is passed to
+     * [`send_uploaded_video_with_transaction_id_returning_event_id`].
+     *
+     * If provided, `progress_watcher` reports progress for the original video
+     * upload. Thumbnail upload progress is intentionally omitted.
+     */
+    func uploadVideoForEvent(originalFilePath: String, thumbnailFilePath: String?, originalMimetype: String, originalSize: UInt64, originalDuration: TimeInterval, originalWidth: UInt64, originalHeight: UInt64, thumbnailMimetype: String?, thumbnailSize: UInt64?, thumbnailWidth: UInt64?, thumbnailHeight: UInt64?, blurhash: String?, progressWatcher: ProgressWatcher?) async throws  -> String
     
     /**
      * Upload a voice message for a later typed `m.audio` voice event.
@@ -10638,6 +10656,27 @@ open func sendUploadedImageWithTransactionIdReturningEventId(uploadedImageJson: 
 }
     
     /**
+     * Send a previously uploaded video as a typed `m.video` event with a
+     * caller-provided transaction ID, returning the homeserver event ID.
+     */
+open func sendUploadedVideoWithTransactionIdReturningEventId(uploadedVideoJson: String, transactionId: String, caption: String?, formattedCaption: String?, replyEventId: String?)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_uploaded_video_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(uploadedVideoJson),FfiConverterString.lower(transactionId),FfiConverterOptionString.lower(caption),FfiConverterOptionString.lower(formattedCaption),FfiConverterOptionString.lower(replyEventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeUploadedVideoError_lift
+        )
+}
+    
+    /**
      * Send a previously uploaded voice message as a typed `m.audio` voice
      * event with a caller-provided transaction ID, returning the homeserver
      * event ID.
@@ -11228,6 +11267,33 @@ open func uploadImageForEvent(originalFilePath: String, thumbnailFilePath: Strin
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeUploadedImageError_lift
+        )
+}
+    
+    /**
+     * Upload a video and optional thumbnail for a later typed `m.video` event.
+     *
+     * The returned JSON string is opaque to the caller and should be persisted
+     * as-is until it is passed to
+     * [`send_uploaded_video_with_transaction_id_returning_event_id`].
+     *
+     * If provided, `progress_watcher` reports progress for the original video
+     * upload. Thumbnail upload progress is intentionally omitted.
+     */
+open func uploadVideoForEvent(originalFilePath: String, thumbnailFilePath: String?, originalMimetype: String, originalSize: UInt64, originalDuration: TimeInterval, originalWidth: UInt64, originalHeight: UInt64, thumbnailMimetype: String?, thumbnailSize: UInt64?, thumbnailWidth: UInt64?, thumbnailHeight: UInt64?, blurhash: String?, progressWatcher: ProgressWatcher?)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_upload_video_for_event(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(originalFilePath),FfiConverterOptionString.lower(thumbnailFilePath),FfiConverterString.lower(originalMimetype),FfiConverterUInt64.lower(originalSize),FfiConverterDuration.lower(originalDuration),FfiConverterUInt64.lower(originalWidth),FfiConverterUInt64.lower(originalHeight),FfiConverterOptionString.lower(thumbnailMimetype),FfiConverterOptionUInt64.lower(thumbnailSize),FfiConverterOptionUInt64.lower(thumbnailWidth),FfiConverterOptionUInt64.lower(thumbnailHeight),FfiConverterOptionString.lower(blurhash),FfiConverterOptionCallbackInterfaceProgressWatcher.lower(progressWatcher)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeUploadedVideoError_lift
         )
 }
     
@@ -42563,6 +42629,94 @@ public func FfiConverterTypeUploadedImageError_lower(_ value: UploadedImageError
 }
 
 
+public enum UploadedVideoError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    case Validation(msg: String, details: String?
+    )
+    case Retryable(msg: String, details: String?
+    )
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension UploadedVideoError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeUploadedVideoError: FfiConverterRustBuffer {
+    typealias SwiftType = UploadedVideoError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> UploadedVideoError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .Validation(
+            msg: try FfiConverterString.read(from: &buf), 
+            details: try FfiConverterOptionString.read(from: &buf)
+            )
+        case 2: return .Retryable(
+            msg: try FfiConverterString.read(from: &buf), 
+            details: try FfiConverterOptionString.read(from: &buf)
+            )
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: UploadedVideoError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case let .Validation(msg,details):
+            writeInt(&buf, Int32(1))
+            FfiConverterString.write(msg, into: &buf)
+            FfiConverterOptionString.write(details, into: &buf)
+            
+        
+        case let .Retryable(msg,details):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(msg, into: &buf)
+            FfiConverterOptionString.write(details, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUploadedVideoError_lift(_ buf: RustBuffer) throws -> UploadedVideoError {
+    return try FfiConverterTypeUploadedVideoError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeUploadedVideoError_lower(_ value: UploadedVideoError) -> RustBuffer {
+    return FfiConverterTypeUploadedVideoError.lower(value)
+}
+
+
 public enum UploadedVoiceError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
 
     
@@ -54180,6 +54334,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_uploaded_image_with_transaction_id_returning_event_id() != 51817) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_uploaded_video_with_transaction_id_returning_event_id() != 38370) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_send_uploaded_voice_with_transaction_id_returning_event_id() != 1122) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54271,6 +54428,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_image_for_event() != 12709) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_video_for_event() != 57355) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_upload_voice_for_event() != 35038) {
