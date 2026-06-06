@@ -834,6 +834,15 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func accountUrl(action: AccountManagementAction?) async throws  -> String?
     
     /**
+     * Listen for custom to-device events of the given type.
+     *
+     * If `encrypted_only` is true, plaintext to-device events are ignored.
+     * The returned task handle keeps the event handler registered and removes
+     * it when cancelled or dropped.
+     */
+    func addCustomToDeviceEventListener(eventType: String, encryptedOnly: Bool, listener: CustomToDeviceEventListener)  -> TaskHandle
+    
+    /**
      * Find all sliding sync versions that are available.
      *
      * Be careful: This method may hit the store and will send new requests for
@@ -1643,6 +1652,24 @@ open func accountUrl(action: AccountManagementAction?)async throws  -> String?  
             liftFunc: FfiConverterOptionString.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
+}
+    
+    /**
+     * Listen for custom to-device events of the given type.
+     *
+     * If `encrypted_only` is true, plaintext to-device events are ignored.
+     * The returned task handle keeps the event handler registered and removes
+     * it when cancelled or dropped.
+     */
+open func addCustomToDeviceEventListener(eventType: String, encryptedOnly: Bool, listener: CustomToDeviceEventListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_client_add_custom_to_device_event_listener(
+            self.uniffiCloneHandle(),
+        FfiConverterString.lower(eventType),
+        FfiConverterBool.lower(encryptedOnly),
+        FfiConverterCallbackInterfaceCustomToDeviceEventListener_lower(listener),$0
+    )
+})
 }
     
     /**
@@ -4355,6 +4382,25 @@ public protocol EncryptionProtocol: AnyObject, Sendable {
     func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, progressListener: EnableRecoveryProgressListener) async throws  -> String
     
     /**
+     * Encrypt and send raw custom to-device event content to the exact target
+     * devices.
+     *
+     * The `content_json` parameter must be a JSON object representing the
+     * plaintext content of the custom to-device event.
+     */
+    func encryptAndSendRawToDevice(eventType: String, targets: [ToDeviceTarget], contentJson: String) async throws  -> [CustomToDeviceEventSendFailure]
+    
+    /**
+     * Get device information from the crypto store.
+     */
+    func getDevice(userId: String, deviceId: String) async throws  -> DeviceInfo?
+    
+    /**
+     * Get all known devices for a user from the crypto store.
+     */
+    func getUserDevices(userId: String) async throws  -> [DeviceInfo]
+    
+    /**
      * Does the user have other devices that the current device can verify
      * against?
      *
@@ -4638,6 +4684,70 @@ open func enableRecovery(waitForBackupsToUpload: Bool, passphrase: String?, prog
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeRecoveryError_lift
+        )
+}
+    
+    /**
+     * Encrypt and send raw custom to-device event content to the exact target
+     * devices.
+     *
+     * The `content_json` parameter must be a JSON object representing the
+     * plaintext content of the custom to-device event.
+     */
+open func encryptAndSendRawToDevice(eventType: String, targets: [ToDeviceTarget], contentJson: String)async throws  -> [CustomToDeviceEventSendFailure]  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_encrypt_and_send_raw_to_device(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventType),FfiConverterSequenceTypeToDeviceTarget.lower(targets),FfiConverterString.lower(contentJson)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeCustomToDeviceEventSendFailure.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Get device information from the crypto store.
+     */
+open func getDevice(userId: String, deviceId: String)async throws  -> DeviceInfo?  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_get_device(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(userId),FfiConverterString.lower(deviceId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeDeviceInfo.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Get all known devices for a user from the crypto store.
+     */
+open func getUserDevices(userId: String)async throws  -> [DeviceInfo]  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_encryption_get_user_devices(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(userId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterSequenceTypeDeviceInfo.lift,
+            errorHandler: FfiConverterTypeClientError_lift
         )
 }
     
@@ -19778,6 +19888,282 @@ public func FfiConverterTypeCreateRoomParameters_lower(_ value: CreateRoomParame
 }
 
 
+public struct CustomToDeviceEvent: Equatable, Hashable {
+    public var eventType: String
+    public var sender: String
+    public var contentJson: String
+    public var rawJson: String
+    public var encryptionInfo: CustomToDeviceEventEncryptionInfo?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(eventType: String, sender: String, contentJson: String, rawJson: String, encryptionInfo: CustomToDeviceEventEncryptionInfo?) {
+        self.eventType = eventType
+        self.sender = sender
+        self.contentJson = contentJson
+        self.rawJson = rawJson
+        self.encryptionInfo = encryptionInfo
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CustomToDeviceEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCustomToDeviceEvent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CustomToDeviceEvent {
+        return
+            try CustomToDeviceEvent(
+                eventType: FfiConverterString.read(from: &buf), 
+                sender: FfiConverterString.read(from: &buf), 
+                contentJson: FfiConverterString.read(from: &buf), 
+                rawJson: FfiConverterString.read(from: &buf), 
+                encryptionInfo: FfiConverterOptionTypeCustomToDeviceEventEncryptionInfo.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CustomToDeviceEvent, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.eventType, into: &buf)
+        FfiConverterString.write(value.sender, into: &buf)
+        FfiConverterString.write(value.contentJson, into: &buf)
+        FfiConverterString.write(value.rawJson, into: &buf)
+        FfiConverterOptionTypeCustomToDeviceEventEncryptionInfo.write(value.encryptionInfo, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCustomToDeviceEvent_lift(_ buf: RustBuffer) throws -> CustomToDeviceEvent {
+    return try FfiConverterTypeCustomToDeviceEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCustomToDeviceEvent_lower(_ value: CustomToDeviceEvent) -> RustBuffer {
+    return FfiConverterTypeCustomToDeviceEvent.lower(value)
+}
+
+
+public struct CustomToDeviceEventEncryptionInfo: Equatable, Hashable {
+    public var sender: String
+    public var senderDevice: String?
+    public var senderCurve25519KeyBase64: String?
+    public var senderVerified: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(sender: String, senderDevice: String?, senderCurve25519KeyBase64: String?, senderVerified: Bool) {
+        self.sender = sender
+        self.senderDevice = senderDevice
+        self.senderCurve25519KeyBase64 = senderCurve25519KeyBase64
+        self.senderVerified = senderVerified
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CustomToDeviceEventEncryptionInfo: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCustomToDeviceEventEncryptionInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CustomToDeviceEventEncryptionInfo {
+        return
+            try CustomToDeviceEventEncryptionInfo(
+                sender: FfiConverterString.read(from: &buf), 
+                senderDevice: FfiConverterOptionString.read(from: &buf), 
+                senderCurve25519KeyBase64: FfiConverterOptionString.read(from: &buf), 
+                senderVerified: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CustomToDeviceEventEncryptionInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.sender, into: &buf)
+        FfiConverterOptionString.write(value.senderDevice, into: &buf)
+        FfiConverterOptionString.write(value.senderCurve25519KeyBase64, into: &buf)
+        FfiConverterBool.write(value.senderVerified, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCustomToDeviceEventEncryptionInfo_lift(_ buf: RustBuffer) throws -> CustomToDeviceEventEncryptionInfo {
+    return try FfiConverterTypeCustomToDeviceEventEncryptionInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCustomToDeviceEventEncryptionInfo_lower(_ value: CustomToDeviceEventEncryptionInfo) -> RustBuffer {
+    return FfiConverterTypeCustomToDeviceEventEncryptionInfo.lower(value)
+}
+
+
+public struct CustomToDeviceEventSendFailure: Equatable, Hashable {
+    public var userId: String
+    public var deviceId: String
+    public var reason: CustomToDeviceEventSendFailureReason
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(userId: String, deviceId: String, reason: CustomToDeviceEventSendFailureReason) {
+        self.userId = userId
+        self.deviceId = deviceId
+        self.reason = reason
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension CustomToDeviceEventSendFailure: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCustomToDeviceEventSendFailure: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CustomToDeviceEventSendFailure {
+        return
+            try CustomToDeviceEventSendFailure(
+                userId: FfiConverterString.read(from: &buf), 
+                deviceId: FfiConverterString.read(from: &buf), 
+                reason: FfiConverterTypeCustomToDeviceEventSendFailureReason.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: CustomToDeviceEventSendFailure, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.userId, into: &buf)
+        FfiConverterString.write(value.deviceId, into: &buf)
+        FfiConverterTypeCustomToDeviceEventSendFailureReason.write(value.reason, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCustomToDeviceEventSendFailure_lift(_ buf: RustBuffer) throws -> CustomToDeviceEventSendFailure {
+    return try FfiConverterTypeCustomToDeviceEventSendFailure.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCustomToDeviceEventSendFailure_lower(_ value: CustomToDeviceEventSendFailure) -> RustBuffer {
+    return FfiConverterTypeCustomToDeviceEventSendFailure.lower(value)
+}
+
+
+public struct DeviceInfo: Equatable, Hashable {
+    public var userId: String
+    public var deviceId: String
+    public var displayName: String?
+    public var curve25519Key: String?
+    public var ed25519Key: String?
+    public var isVerified: Bool
+    public var isVerifiedWithCrossSigning: Bool
+    public var isCrossSignedByOwner: Bool
+    public var isLocallyTrusted: Bool
+    public var isBlacklisted: Bool
+    public var isDeleted: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(userId: String, deviceId: String, displayName: String?, curve25519Key: String?, ed25519Key: String?, isVerified: Bool, isVerifiedWithCrossSigning: Bool, isCrossSignedByOwner: Bool, isLocallyTrusted: Bool, isBlacklisted: Bool, isDeleted: Bool) {
+        self.userId = userId
+        self.deviceId = deviceId
+        self.displayName = displayName
+        self.curve25519Key = curve25519Key
+        self.ed25519Key = ed25519Key
+        self.isVerified = isVerified
+        self.isVerifiedWithCrossSigning = isVerifiedWithCrossSigning
+        self.isCrossSignedByOwner = isCrossSignedByOwner
+        self.isLocallyTrusted = isLocallyTrusted
+        self.isBlacklisted = isBlacklisted
+        self.isDeleted = isDeleted
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DeviceInfo: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDeviceInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DeviceInfo {
+        return
+            try DeviceInfo(
+                userId: FfiConverterString.read(from: &buf), 
+                deviceId: FfiConverterString.read(from: &buf), 
+                displayName: FfiConverterOptionString.read(from: &buf), 
+                curve25519Key: FfiConverterOptionString.read(from: &buf), 
+                ed25519Key: FfiConverterOptionString.read(from: &buf), 
+                isVerified: FfiConverterBool.read(from: &buf), 
+                isVerifiedWithCrossSigning: FfiConverterBool.read(from: &buf), 
+                isCrossSignedByOwner: FfiConverterBool.read(from: &buf), 
+                isLocallyTrusted: FfiConverterBool.read(from: &buf), 
+                isBlacklisted: FfiConverterBool.read(from: &buf), 
+                isDeleted: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DeviceInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.userId, into: &buf)
+        FfiConverterString.write(value.deviceId, into: &buf)
+        FfiConverterOptionString.write(value.displayName, into: &buf)
+        FfiConverterOptionString.write(value.curve25519Key, into: &buf)
+        FfiConverterOptionString.write(value.ed25519Key, into: &buf)
+        FfiConverterBool.write(value.isVerified, into: &buf)
+        FfiConverterBool.write(value.isVerifiedWithCrossSigning, into: &buf)
+        FfiConverterBool.write(value.isCrossSignedByOwner, into: &buf)
+        FfiConverterBool.write(value.isLocallyTrusted, into: &buf)
+        FfiConverterBool.write(value.isBlacklisted, into: &buf)
+        FfiConverterBool.write(value.isDeleted, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDeviceInfo_lift(_ buf: RustBuffer) throws -> DeviceInfo {
+    return try FfiConverterTypeDeviceInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDeviceInfo_lower(_ value: DeviceInfo) -> RustBuffer {
+    return FfiConverterTypeDeviceInfo.lower(value)
+}
+
+
 /**
  * Information about the old and new key that caused a duplicate key upload
  * error in /keys/upload.
@@ -26699,6 +27085,60 @@ public func FfiConverterTypeTimelineUniqueId_lower(_ value: TimelineUniqueId) ->
 }
 
 
+public struct ToDeviceTarget: Equatable, Hashable {
+    public var userId: String
+    public var deviceId: String
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(userId: String, deviceId: String) {
+        self.userId = userId
+        self.deviceId = deviceId
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension ToDeviceTarget: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeToDeviceTarget: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ToDeviceTarget {
+        return
+            try ToDeviceTarget(
+                userId: FfiConverterString.read(from: &buf), 
+                deviceId: FfiConverterString.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: ToDeviceTarget, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.userId, into: &buf)
+        FfiConverterString.write(value.deviceId, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeToDeviceTarget_lift(_ buf: RustBuffer) throws -> ToDeviceTarget {
+    return try FfiConverterTypeToDeviceTarget.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeToDeviceTarget_lower(_ value: ToDeviceTarget) -> RustBuffer {
+    return FfiConverterTypeToDeviceTarget.lower(value)
+}
+
+
 public struct TracingConfiguration: Equatable, Hashable {
     /**
      * The desired log level.
@@ -29620,6 +30060,80 @@ public func FfiConverterTypeCrossSigningResetAuthType_lift(_ buf: RustBuffer) th
 #endif
 public func FfiConverterTypeCrossSigningResetAuthType_lower(_ value: CrossSigningResetAuthType) -> RustBuffer {
     return FfiConverterTypeCrossSigningResetAuthType.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum CustomToDeviceEventSendFailureReason: Equatable, Hashable {
+    
+    case missingDevice
+    case withheld
+    case sendFailed
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension CustomToDeviceEventSendFailureReason: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeCustomToDeviceEventSendFailureReason: FfiConverterRustBuffer {
+    typealias SwiftType = CustomToDeviceEventSendFailureReason
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> CustomToDeviceEventSendFailureReason {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .missingDevice
+        
+        case 2: return .withheld
+        
+        case 3: return .sendFailed
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: CustomToDeviceEventSendFailureReason, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .missingDevice:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .withheld:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .sendFailed:
+            writeInt(&buf, Int32(3))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCustomToDeviceEventSendFailureReason_lift(_ buf: RustBuffer) throws -> CustomToDeviceEventSendFailureReason {
+    return try FfiConverterTypeCustomToDeviceEventSendFailureReason.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeCustomToDeviceEventSendFailureReason_lower(_ value: CustomToDeviceEventSendFailureReason) -> RustBuffer {
+    return FfiConverterTypeCustomToDeviceEventSendFailureReason.lower(value)
 }
 
 
@@ -44232,6 +44746,130 @@ public func FfiConverterCallbackInterfaceClientSessionDelegate_lower(_ v: Client
 
 
 
+public protocol CustomToDeviceEventListener: AnyObject, Sendable {
+    
+    func onEvent(event: CustomToDeviceEvent) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceCustomToDeviceEventListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceCustomToDeviceEventListener] = [UniffiVTableCallbackInterfaceCustomToDeviceEventListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceCustomToDeviceEventListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface CustomToDeviceEventListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceCustomToDeviceEventListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface CustomToDeviceEventListener: handle missing in uniffiClone")
+            }
+        },
+        onEvent: { (
+            uniffiHandle: UInt64,
+            event: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceCustomToDeviceEventListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onEvent(
+                     event: try FfiConverterTypeCustomToDeviceEvent_lift(event)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitCustomToDeviceEventListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_customtodeviceeventlistener(UniffiCallbackInterfaceCustomToDeviceEventListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceCustomToDeviceEventListener {
+    fileprivate static let handleMap = UniffiHandleMap<CustomToDeviceEventListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceCustomToDeviceEventListener : FfiConverter {
+    typealias SwiftType = CustomToDeviceEventListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceCustomToDeviceEventListener_lift(_ handle: UInt64) throws -> CustomToDeviceEventListener {
+    return try FfiConverterCallbackInterfaceCustomToDeviceEventListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceCustomToDeviceEventListener_lower(_ v: CustomToDeviceEventListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceCustomToDeviceEventListener.lower(v)
+}
+
+
+
+
 /**
  * A listener for duplicate key upload errors triggered by requests to
  * /keys/upload.
@@ -50066,6 +50704,54 @@ fileprivate struct FfiConverterOptionTypeComposerDraft: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeCustomToDeviceEventEncryptionInfo: FfiConverterRustBuffer {
+    typealias SwiftType = CustomToDeviceEventEncryptionInfo?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeCustomToDeviceEventEncryptionInfo.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeCustomToDeviceEventEncryptionInfo.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterOptionTypeDeviceInfo: FfiConverterRustBuffer {
+    typealias SwiftType = DeviceInfo?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeDeviceInfo.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeDeviceInfo.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeDuplicateOneTimeKeyErrorMessage: FfiConverterRustBuffer {
     typealias SwiftType = DuplicateOneTimeKeyErrorMessage?
 
@@ -51779,6 +52465,56 @@ fileprivate struct FfiConverterSequenceTypeConditionalPushRule: FfiConverterRust
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterSequenceTypeCustomToDeviceEventSendFailure: FfiConverterRustBuffer {
+    typealias SwiftType = [CustomToDeviceEventSendFailure]
+
+    public static func write(_ value: [CustomToDeviceEventSendFailure], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeCustomToDeviceEventSendFailure.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [CustomToDeviceEventSendFailure] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [CustomToDeviceEventSendFailure]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeCustomToDeviceEventSendFailure.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeDeviceInfo: FfiConverterRustBuffer {
+    typealias SwiftType = [DeviceInfo]
+
+    public static func write(_ value: [DeviceInfo], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeDeviceInfo.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [DeviceInfo] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [DeviceInfo]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeDeviceInfo.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterSequenceTypeGlobalSearchResult: FfiConverterRustBuffer {
     typealias SwiftType = [GlobalSearchResult]
 
@@ -52246,6 +52982,31 @@ fileprivate struct FfiConverterSequenceTypeThreadListItem: FfiConverterRustBuffe
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypeThreadListItem.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeToDeviceTarget: FfiConverterRustBuffer {
+    typealias SwiftType = [ToDeviceTarget]
+
+    public static func write(_ value: [ToDeviceTarget], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeToDeviceTarget.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [ToDeviceTarget] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [ToDeviceTarget]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeToDeviceTarget.read(from: &buf))
         }
         return seq
     }
@@ -53627,6 +54388,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_account_url() != 53991) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_add_custom_to_device_event_listener() != 51695) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_available_sliding_sync_versions() != 46726) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54081,6 +54845,15 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_enable_recovery() != 2033) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_encrypt_and_send_raw_to_device() != 63877) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_get_device() != 10635) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_encryption_get_user_devices() != 37292) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_encryption_has_devices_to_verify_against() != 50754) {
@@ -55178,6 +55951,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_clientsessiondelegate_save_session_in_keychain() != 4452) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_customtodeviceeventlistener_on_event() != 19651) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_duplicatekeyuploaderrorlistener_on_duplicate_key_upload_error() != 17775) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -55336,6 +56112,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitCallDeclineListener()
     uniffiCallbackInitClientDelegate()
     uniffiCallbackInitClientSessionDelegate()
+    uniffiCallbackInitCustomToDeviceEventListener()
     uniffiCallbackInitDuplicateKeyUploadErrorListener()
     uniffiCallbackInitEnableRecoveryProgressListener()
     uniffiCallbackInitGeneratedQrLoginProgressListener()
