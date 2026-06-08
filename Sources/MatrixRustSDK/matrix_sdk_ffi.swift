@@ -880,6 +880,11 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func canDeactivateAccount()  -> Bool
     
     /**
+     * Cancel a scheduled delayed event.
+     */
+    func cancelDelayedEvent(delayId: String) async throws 
+    
+    /**
      * Clear all the non-critical caches for this Client instance.
      *
      * WARNING: This will clear all the caches, including the base store (state
@@ -1272,6 +1277,11 @@ public protocol ClientProtocol: AnyObject, Sendable {
     func resolveRoomAlias(roomAlias: String) async throws  -> ResolvedRoomAlias?
     
     /**
+     * Restart the timeout for a scheduled delayed event.
+     */
+    func restartDelayedEvent(delayId: String) async throws 
+    
+    /**
      * Restores the client from a `Session`.
      *
      * It reloads the entire set of rooms from the previous session.
@@ -1308,7 +1318,21 @@ public protocol ClientProtocol: AnyObject, Sendable {
     
     func rooms()  -> [Room]
     
+    /**
+     * Schedule a raw state event to be sent later using MSC4140 delayed
+     * events.
+     *
+     * This is a generic transport API. MatrixRTC callers are expected to pass
+     * the MatrixRTC membership state event type, state key, and content.
+     */
+    func scheduleDelayedStateEvent(roomId: String, eventType: String, stateKey: String, contentJson: String, delayMs: UInt64) async throws  -> String
+    
     func searchUsers(searchTerm: String, limit: UInt64) async throws  -> SearchUsersResults
+    
+    /**
+     * Send a scheduled delayed event immediately.
+     */
+    func sendDelayedEvent(delayId: String) async throws 
     
     /**
      * The URL of the server.
@@ -1774,6 +1798,26 @@ open func canDeactivateAccount() -> Bool  {
             self.uniffiCloneHandle(),$0
     )
 })
+}
+    
+    /**
+     * Cancel a scheduled delayed event.
+     */
+open func cancelDelayedEvent(delayId: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_cancel_delayed_event(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(delayId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeDelayedEventError_lift
+        )
 }
     
     /**
@@ -2949,6 +2993,26 @@ open func resolveRoomAlias(roomAlias: String)async throws  -> ResolvedRoomAlias?
 }
     
     /**
+     * Restart the timeout for a scheduled delayed event.
+     */
+open func restartDelayedEvent(delayId: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_restart_delayed_event(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(delayId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeDelayedEventError_lift
+        )
+}
+    
+    /**
      * Restores the client from a `Session`.
      *
      * It reloads the entire set of rooms from the previous session.
@@ -3057,6 +3121,30 @@ open func rooms() -> [Room]  {
 })
 }
     
+    /**
+     * Schedule a raw state event to be sent later using MSC4140 delayed
+     * events.
+     *
+     * This is a generic transport API. MatrixRTC callers are expected to pass
+     * the MatrixRTC membership state event type, state key, and content.
+     */
+open func scheduleDelayedStateEvent(roomId: String, eventType: String, stateKey: String, contentJson: String, delayMs: UInt64)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_schedule_delayed_state_event(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(roomId),FfiConverterString.lower(eventType),FfiConverterString.lower(stateKey),FfiConverterString.lower(contentJson),FfiConverterUInt64.lower(delayMs)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeDelayedEventError_lift
+        )
+}
+    
 open func searchUsers(searchTerm: String, limit: UInt64)async throws  -> SearchUsersResults  {
     return
         try  await uniffiRustCallAsync(
@@ -3071,6 +3159,26 @@ open func searchUsers(searchTerm: String, limit: UInt64)async throws  -> SearchU
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
             liftFunc: FfiConverterTypeSearchUsersResults_lift,
             errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Send a scheduled delayed event immediately.
+     */
+open func sendDelayedEvent(delayId: String)async throws   {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_client_send_delayed_event(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(delayId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_void,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
+            liftFunc: { $0 },
+            errorHandler: FfiConverterTypeDelayedEventError_lift
         )
 }
     
@@ -30208,6 +30316,114 @@ public func FfiConverterTypeDateDividerMode_lower(_ value: DateDividerMode) -> R
 }
 
 
+
+public enum DelayedEventError: Swift.Error, Equatable, Hashable, Foundation.LocalizedError {
+
+    
+    
+    case DelayedEventsUnsupported
+    case NotFound
+    case RateLimited(retryAfterMs: UInt64?
+    )
+    case MaxDelayExceeded(maxDelayMs: UInt64?
+    )
+    case Generic(msg: String, details: String?
+    )
+
+    
+
+    
+
+    
+    public var errorDescription: String? {
+        String(reflecting: self)
+    }
+    
+}
+
+#if compiler(>=6)
+extension DelayedEventError: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDelayedEventError: FfiConverterRustBuffer {
+    typealias SwiftType = DelayedEventError
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DelayedEventError {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+
+        
+
+        
+        case 1: return .DelayedEventsUnsupported
+        case 2: return .NotFound
+        case 3: return .RateLimited(
+            retryAfterMs: try FfiConverterOptionUInt64.read(from: &buf)
+            )
+        case 4: return .MaxDelayExceeded(
+            maxDelayMs: try FfiConverterOptionUInt64.read(from: &buf)
+            )
+        case 5: return .Generic(
+            msg: try FfiConverterString.read(from: &buf), 
+            details: try FfiConverterOptionString.read(from: &buf)
+            )
+
+         default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: DelayedEventError, into buf: inout [UInt8]) {
+        switch value {
+
+        
+
+        
+        
+        case .DelayedEventsUnsupported:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .NotFound:
+            writeInt(&buf, Int32(2))
+        
+        
+        case let .RateLimited(retryAfterMs):
+            writeInt(&buf, Int32(3))
+            FfiConverterOptionUInt64.write(retryAfterMs, into: &buf)
+            
+        
+        case let .MaxDelayExceeded(maxDelayMs):
+            writeInt(&buf, Int32(4))
+            FfiConverterOptionUInt64.write(maxDelayMs, into: &buf)
+            
+        
+        case let .Generic(msg,details):
+            writeInt(&buf, Int32(5))
+            FfiConverterString.write(msg, into: &buf)
+            FfiConverterOptionString.write(details, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDelayedEventError_lift(_ buf: RustBuffer) throws -> DelayedEventError {
+    return try FfiConverterTypeDelayedEventError.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDelayedEventError_lower(_ value: DelayedEventError) -> RustBuffer {
+    return FfiConverterTypeDelayedEventError.lower(value)
+}
+
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
@@ -54406,6 +54622,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_can_deactivate_account() != 27747) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_cancel_delayed_event() != 22629) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_clear_caches() != 61351) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54583,6 +54802,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_resolve_room_alias() != 16053) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_restart_delayed_event() != 16941) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_restore_session() != 56243) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -54601,7 +54823,13 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_client_rooms() != 57092) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_schedule_delayed_state_event() != 1969) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_search_users() != 23484) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_client_send_delayed_event() != 58388) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_client_server() != 11140) {
