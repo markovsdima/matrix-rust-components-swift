@@ -8824,6 +8824,16 @@ public protocol RoomProtocol: AnyObject, Sendable {
      */
     func forget() async throws 
     
+    /**
+     * Retrieve raw room events related to a given event, using the Matrix
+     * relations API.
+     *
+     * This is useful to backfill relation events such as `m.reaction` events
+     * for a MatrixRTC membership event without going through the UI timeline
+     * aggregation model.
+     */
+    func getEventRelations(eventId: String, options: RawRoomRelationsOptions) async throws  -> RawRoomRelations
+    
     func getPowerLevels() async throws  -> RoomPowerLevels
     
     /**
@@ -9284,6 +9294,18 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * subscription.
      */
     func subscribeToKnockRequests(listener: KnockRequestsListener) async throws  -> TaskHandle
+    
+    /**
+     * Listen for live raw timeline events in this room, filtered by event type.
+     *
+     * This bypasses the UI timeline item model, so relation events such as
+     * `m.reaction` and `m.room.redaction` can be observed even when they are
+     * aggregated into other timeline items.
+     *
+     * The returned task handle keeps the event handler registered and removes
+     * it when cancelled or dropped.
+     */
+    func subscribeToRawTimelineEvents(eventTypes: [String], listener: RawRoomEventListener)  -> TaskHandle
     
     func subscribeToRoomInfoUpdates(listener: RoomInfoListener)  -> TaskHandle
     
@@ -9795,6 +9817,31 @@ open func forget()async throws   {
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Retrieve raw room events related to a given event, using the Matrix
+     * relations API.
+     *
+     * This is useful to backfill relation events such as `m.reaction` events
+     * for a MatrixRTC membership event without going through the UI timeline
+     * aggregation model.
+     */
+open func getEventRelations(eventId: String, options: RawRoomRelationsOptions)async throws  -> RawRoomRelations  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_get_event_relations(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventId),FfiConverterTypeRawRoomRelationsOptions_lower(options)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeRawRoomRelations_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -11227,6 +11274,26 @@ open func subscribeToKnockRequests(listener: KnockRequestsListener)async throws 
             liftFunc: FfiConverterTypeTaskHandle_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
+}
+    
+    /**
+     * Listen for live raw timeline events in this room, filtered by event type.
+     *
+     * This bypasses the UI timeline item model, so relation events such as
+     * `m.reaction` and `m.room.redaction` can be observed even when they are
+     * aggregated into other timeline items.
+     *
+     * The returned task handle keeps the event handler registered and removes
+     * it when cancelled or dropped.
+     */
+open func subscribeToRawTimelineEvents(eventTypes: [String], listener: RawRoomEventListener) -> TaskHandle  {
+    return try!  FfiConverterTypeTaskHandle_lift(try! rustCall() {
+    uniffi_matrix_sdk_ffi_fn_method_room_subscribe_to_raw_timeline_events(
+            self.uniffiCloneHandle(),
+        FfiConverterSequenceString.lower(eventTypes),
+        FfiConverterCallbackInterfaceRawRoomEventListener_lower(listener),$0
+    )
+})
 }
     
 open func subscribeToRoomInfoUpdates(listener: RoomInfoListener) -> TaskHandle  {
@@ -23694,6 +23761,278 @@ public func FfiConverterTypePusherIdentifiers_lift(_ buf: RustBuffer) throws -> 
 #endif
 public func FfiConverterTypePusherIdentifiers_lower(_ value: PusherIdentifiers) -> RustBuffer {
     return FfiConverterTypePusherIdentifiers.lower(value)
+}
+
+
+public struct RawRoomEvent: Equatable, Hashable {
+    public var roomId: String
+    public var eventType: String
+    public var eventId: String?
+    public var sender: String?
+    public var originServerTsMs: UInt64?
+    public var contentJson: String
+    public var rawJson: String
+    public var encryptionInfo: RawRoomEventEncryptionInfo?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(roomId: String, eventType: String, eventId: String?, sender: String?, originServerTsMs: UInt64?, contentJson: String, rawJson: String, encryptionInfo: RawRoomEventEncryptionInfo?) {
+        self.roomId = roomId
+        self.eventType = eventType
+        self.eventId = eventId
+        self.sender = sender
+        self.originServerTsMs = originServerTsMs
+        self.contentJson = contentJson
+        self.rawJson = rawJson
+        self.encryptionInfo = encryptionInfo
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RawRoomEvent: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRawRoomEvent: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RawRoomEvent {
+        return
+            try RawRoomEvent(
+                roomId: FfiConverterString.read(from: &buf), 
+                eventType: FfiConverterString.read(from: &buf), 
+                eventId: FfiConverterOptionString.read(from: &buf), 
+                sender: FfiConverterOptionString.read(from: &buf), 
+                originServerTsMs: FfiConverterOptionUInt64.read(from: &buf), 
+                contentJson: FfiConverterString.read(from: &buf), 
+                rawJson: FfiConverterString.read(from: &buf), 
+                encryptionInfo: FfiConverterOptionTypeRawRoomEventEncryptionInfo.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RawRoomEvent, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.roomId, into: &buf)
+        FfiConverterString.write(value.eventType, into: &buf)
+        FfiConverterOptionString.write(value.eventId, into: &buf)
+        FfiConverterOptionString.write(value.sender, into: &buf)
+        FfiConverterOptionUInt64.write(value.originServerTsMs, into: &buf)
+        FfiConverterString.write(value.contentJson, into: &buf)
+        FfiConverterString.write(value.rawJson, into: &buf)
+        FfiConverterOptionTypeRawRoomEventEncryptionInfo.write(value.encryptionInfo, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomEvent_lift(_ buf: RustBuffer) throws -> RawRoomEvent {
+    return try FfiConverterTypeRawRoomEvent.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomEvent_lower(_ value: RawRoomEvent) -> RustBuffer {
+    return FfiConverterTypeRawRoomEvent.lower(value)
+}
+
+
+public struct RawRoomEventEncryptionInfo: Equatable, Hashable {
+    public var sender: String
+    public var senderDevice: String?
+    public var senderCurve25519KeyBase64: String?
+    public var senderVerified: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(sender: String, senderDevice: String?, senderCurve25519KeyBase64: String?, senderVerified: Bool) {
+        self.sender = sender
+        self.senderDevice = senderDevice
+        self.senderCurve25519KeyBase64 = senderCurve25519KeyBase64
+        self.senderVerified = senderVerified
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RawRoomEventEncryptionInfo: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRawRoomEventEncryptionInfo: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RawRoomEventEncryptionInfo {
+        return
+            try RawRoomEventEncryptionInfo(
+                sender: FfiConverterString.read(from: &buf), 
+                senderDevice: FfiConverterOptionString.read(from: &buf), 
+                senderCurve25519KeyBase64: FfiConverterOptionString.read(from: &buf), 
+                senderVerified: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RawRoomEventEncryptionInfo, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.sender, into: &buf)
+        FfiConverterOptionString.write(value.senderDevice, into: &buf)
+        FfiConverterOptionString.write(value.senderCurve25519KeyBase64, into: &buf)
+        FfiConverterBool.write(value.senderVerified, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomEventEncryptionInfo_lift(_ buf: RustBuffer) throws -> RawRoomEventEncryptionInfo {
+    return try FfiConverterTypeRawRoomEventEncryptionInfo.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomEventEncryptionInfo_lower(_ value: RawRoomEventEncryptionInfo) -> RustBuffer {
+    return FfiConverterTypeRawRoomEventEncryptionInfo.lower(value)
+}
+
+
+public struct RawRoomRelations: Equatable, Hashable {
+    public var chunk: [RawRoomEvent]
+    public var prevBatchToken: String?
+    public var nextBatchToken: String?
+    public var recursionDepth: UInt64?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(chunk: [RawRoomEvent], prevBatchToken: String?, nextBatchToken: String?, recursionDepth: UInt64?) {
+        self.chunk = chunk
+        self.prevBatchToken = prevBatchToken
+        self.nextBatchToken = nextBatchToken
+        self.recursionDepth = recursionDepth
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RawRoomRelations: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRawRoomRelations: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RawRoomRelations {
+        return
+            try RawRoomRelations(
+                chunk: FfiConverterSequenceTypeRawRoomEvent.read(from: &buf), 
+                prevBatchToken: FfiConverterOptionString.read(from: &buf), 
+                nextBatchToken: FfiConverterOptionString.read(from: &buf), 
+                recursionDepth: FfiConverterOptionUInt64.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RawRoomRelations, into buf: inout [UInt8]) {
+        FfiConverterSequenceTypeRawRoomEvent.write(value.chunk, into: &buf)
+        FfiConverterOptionString.write(value.prevBatchToken, into: &buf)
+        FfiConverterOptionString.write(value.nextBatchToken, into: &buf)
+        FfiConverterOptionUInt64.write(value.recursionDepth, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomRelations_lift(_ buf: RustBuffer) throws -> RawRoomRelations {
+    return try FfiConverterTypeRawRoomRelations.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomRelations_lower(_ value: RawRoomRelations) -> RustBuffer {
+    return FfiConverterTypeRawRoomRelations.lower(value)
+}
+
+
+public struct RawRoomRelationsOptions: Equatable, Hashable {
+    public var relationType: String?
+    public var eventType: String?
+    public var from: String?
+    public var limit: UInt64?
+    public var direction: RawRoomRelationsDirection
+    public var recurse: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(relationType: String?, eventType: String?, from: String?, limit: UInt64?, direction: RawRoomRelationsDirection, recurse: Bool) {
+        self.relationType = relationType
+        self.eventType = eventType
+        self.from = from
+        self.limit = limit
+        self.direction = direction
+        self.recurse = recurse
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RawRoomRelationsOptions: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRawRoomRelationsOptions: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RawRoomRelationsOptions {
+        return
+            try RawRoomRelationsOptions(
+                relationType: FfiConverterOptionString.read(from: &buf), 
+                eventType: FfiConverterOptionString.read(from: &buf), 
+                from: FfiConverterOptionString.read(from: &buf), 
+                limit: FfiConverterOptionUInt64.read(from: &buf), 
+                direction: FfiConverterTypeRawRoomRelationsDirection.read(from: &buf), 
+                recurse: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RawRoomRelationsOptions, into buf: inout [UInt8]) {
+        FfiConverterOptionString.write(value.relationType, into: &buf)
+        FfiConverterOptionString.write(value.eventType, into: &buf)
+        FfiConverterOptionString.write(value.from, into: &buf)
+        FfiConverterOptionUInt64.write(value.limit, into: &buf)
+        FfiConverterTypeRawRoomRelationsDirection.write(value.direction, into: &buf)
+        FfiConverterBool.write(value.recurse, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomRelationsOptions_lift(_ buf: RustBuffer) throws -> RawRoomRelationsOptions {
+    return try FfiConverterTypeRawRoomRelationsOptions.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomRelationsOptions_lower(_ value: RawRoomRelationsOptions) -> RustBuffer {
+    return FfiConverterTypeRawRoomRelationsOptions.lower(value)
 }
 
 
@@ -37724,6 +38063,73 @@ public func FfiConverterTypeQueueWedgeError_lower(_ value: QueueWedgeError) -> R
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum RawRoomRelationsDirection: Equatable, Hashable {
+    
+    case backward
+    case forward
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RawRoomRelationsDirection: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRawRoomRelationsDirection: FfiConverterRustBuffer {
+    typealias SwiftType = RawRoomRelationsDirection
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RawRoomRelationsDirection {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .backward
+        
+        case 2: return .forward
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RawRoomRelationsDirection, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .backward:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .forward:
+            writeInt(&buf, Int32(2))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomRelationsDirection_lift(_ buf: RustBuffer) throws -> RawRoomRelationsDirection {
+    return try FfiConverterTypeRawRoomRelationsDirection.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRawRoomRelationsDirection_lower(_ value: RawRoomRelationsDirection) -> RustBuffer {
+    return FfiConverterTypeRawRoomRelationsDirection.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
  * A [`TimelineItem`](super::TimelineItem) that doesn't correspond to an event.
  */
@@ -46840,6 +47246,130 @@ public func FfiConverterCallbackInterfaceQrLoginProgressListener_lower(_ v: QrLo
 
 
 
+public protocol RawRoomEventListener: AnyObject, Sendable {
+    
+    func onEvent(event: RawRoomEvent) 
+    
+}
+
+
+// Put the implementation in a struct so we don't pollute the top-level namespace
+fileprivate struct UniffiCallbackInterfaceRawRoomEventListener {
+
+    // Create the VTable using a series of closures.
+    // Swift automatically converts these into C callback functions.
+    //
+    // This creates 1-element array, since this seems to be the only way to construct a const
+    // pointer that we can pass to the Rust code.
+    static let vtable: [UniffiVTableCallbackInterfaceRawRoomEventListener] = [UniffiVTableCallbackInterfaceRawRoomEventListener(
+        uniffiFree: { (uniffiHandle: UInt64) -> () in
+            do {
+                try FfiConverterCallbackInterfaceRawRoomEventListener.handleMap.remove(handle: uniffiHandle)
+            } catch {
+                print("Uniffi callback interface RawRoomEventListener: handle missing in uniffiFree")
+            }
+        },
+        uniffiClone: { (uniffiHandle: UInt64) -> UInt64 in
+            do {
+                return try FfiConverterCallbackInterfaceRawRoomEventListener.handleMap.clone(handle: uniffiHandle)
+            } catch {
+                fatalError("Uniffi callback interface RawRoomEventListener: handle missing in uniffiClone")
+            }
+        },
+        onEvent: { (
+            uniffiHandle: UInt64,
+            event: RustBuffer,
+            uniffiOutReturn: UnsafeMutableRawPointer,
+            uniffiCallStatus: UnsafeMutablePointer<RustCallStatus>
+        ) in
+            let makeCall = {
+                () throws -> () in
+                guard let uniffiObj = try? FfiConverterCallbackInterfaceRawRoomEventListener.handleMap.get(handle: uniffiHandle) else {
+                    throw UniffiInternalError.unexpectedStaleHandle
+                }
+                return uniffiObj.onEvent(
+                     event: try FfiConverterTypeRawRoomEvent_lift(event)
+                )
+            }
+
+            
+            let writeReturn = { () }
+            uniffiTraitInterfaceCall(
+                callStatus: uniffiCallStatus,
+                makeCall: makeCall,
+                writeReturn: writeReturn
+            )
+        }
+    )]
+}
+
+private func uniffiCallbackInitRawRoomEventListener() {
+    uniffi_matrix_sdk_ffi_fn_init_callback_vtable_rawroomeventlistener(UniffiCallbackInterfaceRawRoomEventListener.vtable)
+}
+
+// FfiConverter protocol for callback interfaces
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterCallbackInterfaceRawRoomEventListener {
+    fileprivate static let handleMap = UniffiHandleMap<RawRoomEventListener>()
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+extension FfiConverterCallbackInterfaceRawRoomEventListener : FfiConverter {
+    typealias SwiftType = RawRoomEventListener
+    typealias FfiType = UInt64
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lift(_ handle: UInt64) throws -> SwiftType {
+        try handleMap.get(handle: handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        let handle: UInt64 = try readInt(&buf)
+        return try lift(handle)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func lower(_ v: SwiftType) -> UInt64 {
+        return handleMap.insert(obj: v)
+    }
+
+#if swift(>=5.8)
+    @_documentation(visibility: private)
+#endif
+    public static func write(_ v: SwiftType, into buf: inout [UInt8]) {
+        writeInt(&buf, lower(v))
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceRawRoomEventListener_lift(_ handle: UInt64) throws -> RawRoomEventListener {
+    return try FfiConverterCallbackInterfaceRawRoomEventListener.lift(handle)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterCallbackInterfaceRawRoomEventListener_lower(_ v: RawRoomEventListener) -> UInt64 {
+    return FfiConverterCallbackInterfaceRawRoomEventListener.lower(v)
+}
+
+
+
+
 public protocol RecoveryStateListener: AnyObject, Sendable {
     
     func onUpdate(status: RecoveryState) 
@@ -51328,6 +51858,30 @@ fileprivate struct FfiConverterOptionTypePredecessorRoom: FfiConverterRustBuffer
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeRawRoomEventEncryptionInfo: FfiConverterRustBuffer {
+    typealias SwiftType = RawRoomEventEncryptionInfo?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeRawRoomEventEncryptionInfo.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeRawRoomEventEncryptionInfo.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeResolvedRoomAlias: FfiConverterRustBuffer {
     typealias SwiftType = ResolvedRoomAlias?
 
@@ -52923,6 +53477,31 @@ fileprivate struct FfiConverterSequenceTypePollAnswer: FfiConverterRustBuffer {
         seq.reserveCapacity(Int(len))
         for _ in 0 ..< len {
             seq.append(try FfiConverterTypePollAnswer.read(from: &buf))
+        }
+        return seq
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+fileprivate struct FfiConverterSequenceTypeRawRoomEvent: FfiConverterRustBuffer {
+    typealias SwiftType = [RawRoomEvent]
+
+    public static func write(_ value: [RawRoomEvent], into buf: inout [UInt8]) {
+        let len = Int32(value.count)
+        writeInt(&buf, len)
+        for item in value {
+            FfiConverterTypeRawRoomEvent.write(item, into: &buf)
+        }
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> [RawRoomEvent] {
+        let len: Int32 = try readInt(&buf)
+        var seq = [RawRoomEvent]()
+        seq.reserveCapacity(Int(len))
+        for _ in 0 ..< len {
+            seq.append(try FfiConverterTypeRawRoomEvent.read(from: &buf))
         }
         return seq
     }
@@ -55354,6 +55933,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_forget() != 10622) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_get_event_relations() != 64372) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_get_power_levels() != 33125) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -55568,6 +56150,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_knock_requests() != 43535) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_raw_timeline_events() != 26278) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_subscribe_to_room_info_updates() != 32254) {
@@ -56248,6 +56833,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_knockrequestslistener_call() != 17262) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_rawroomeventlistener_on_event() != 32990) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_roominfolistener_call() != 61614) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -56355,6 +56943,7 @@ private let initializationResult: InitializationResult = {
     uniffiCallbackInitPaginationStatusListener()
     uniffiCallbackInitProgressWatcher()
     uniffiCallbackInitQrLoginProgressListener()
+    uniffiCallbackInitRawRoomEventListener()
     uniffiCallbackInitRecoveryStateListener()
     uniffiCallbackInitRoomAccountDataListener()
     uniffiCallbackInitRoomDirectorySearchEntriesListener()
