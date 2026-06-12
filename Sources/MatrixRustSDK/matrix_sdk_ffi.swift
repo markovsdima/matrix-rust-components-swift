@@ -8930,6 +8930,12 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func latestEvent() async  -> LatestEventValue
     
     /**
+     * If the room's latest main-timeline event is our own remote event,
+     * summarize public read receipts from other users for it.
+     */
+    func latestOwnMainTimelineReadReceiptSummary() async throws  -> EventReadReceiptSummary?
+    
+    /**
      * Leave this room.
      *
      * Only invited and joined rooms can be left.
@@ -9048,6 +9054,14 @@ public protocol RoomProtocol: AnyObject, Sendable {
      * The raw name as present in the room state event.
      */
     func rawName()  -> String?
+    
+    /**
+     * Summarize public read receipts from other users for a specific event.
+     *
+     * Use [`ReadReceiptThreadScope::Main`] for the main room timeline. It will
+     * consider both `main` and unthreaded receipts for compatibility.
+     */
+    func readReceiptSummaryForEvent(eventId: String, scope: ReadReceiptThreadScope) async throws  -> EventReadReceiptSummary
     
     /**
      * Redacts an event from the room.
@@ -10173,6 +10187,27 @@ open func latestEvent()async  -> LatestEventValue  {
 }
     
     /**
+     * If the room's latest main-timeline event is our own remote event,
+     * summarize public read receipts from other users for it.
+     */
+open func latestOwnMainTimelineReadReceiptSummary()async throws  -> EventReadReceiptSummary?  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_latest_own_main_timeline_read_receipt_summary(
+                    self.uniffiCloneHandle()
+                    
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterOptionTypeEventReadReceiptSummary.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
      * Leave this room.
      *
      * Only invited and joined rooms can be left.
@@ -10555,6 +10590,29 @@ open func rawName() -> String?  {
             self.uniffiCloneHandle(),$0
     )
 })
+}
+    
+    /**
+     * Summarize public read receipts from other users for a specific event.
+     *
+     * Use [`ReadReceiptThreadScope::Main`] for the main room timeline. It will
+     * consider both `main` and unthreaded receipts for compatibility.
+     */
+open func readReceiptSummaryForEvent(eventId: String, scope: ReadReceiptThreadScope)async throws  -> EventReadReceiptSummary  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_read_receipt_summary_for_event(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventId),FfiConverterTypeReadReceiptThreadScope_lower(scope)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterTypeEventReadReceiptSummary_lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
 }
     
     /**
@@ -20460,6 +20518,64 @@ public func FfiConverterTypeEmoteMessageContent_lift(_ buf: RustBuffer) throws -
 #endif
 public func FfiConverterTypeEmoteMessageContent_lower(_ value: EmoteMessageContent) -> RustBuffer {
     return FfiConverterTypeEmoteMessageContent.lower(value)
+}
+
+
+public struct EventReadReceiptSummary: Equatable, Hashable {
+    public var eventId: String
+    public var readByCount: UInt32
+    public var hasReadReceiptFromOtherUser: Bool
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(eventId: String, readByCount: UInt32, hasReadReceiptFromOtherUser: Bool) {
+        self.eventId = eventId
+        self.readByCount = readByCount
+        self.hasReadReceiptFromOtherUser = hasReadReceiptFromOtherUser
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension EventReadReceiptSummary: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeEventReadReceiptSummary: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> EventReadReceiptSummary {
+        return
+            try EventReadReceiptSummary(
+                eventId: FfiConverterString.read(from: &buf), 
+                readByCount: FfiConverterUInt32.read(from: &buf), 
+                hasReadReceiptFromOtherUser: FfiConverterBool.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: EventReadReceiptSummary, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.eventId, into: &buf)
+        FfiConverterUInt32.write(value.readByCount, into: &buf)
+        FfiConverterBool.write(value.hasReadReceiptFromOtherUser, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEventReadReceiptSummary_lift(_ buf: RustBuffer) throws -> EventReadReceiptSummary {
+    return try FfiConverterTypeEventReadReceiptSummary.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeEventReadReceiptSummary_lower(_ value: EventReadReceiptSummary) -> RustBuffer {
+    return FfiConverterTypeEventReadReceiptSummary.lower(value)
 }
 
 
@@ -38130,6 +38246,76 @@ public func FfiConverterTypeRawRoomRelationsDirection_lower(_ value: RawRoomRela
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum ReadReceiptThreadScope: Equatable, Hashable {
+    
+    case main
+    case thread(rootEventId: String
+    )
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension ReadReceiptThreadScope: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeReadReceiptThreadScope: FfiConverterRustBuffer {
+    typealias SwiftType = ReadReceiptThreadScope
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> ReadReceiptThreadScope {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .main
+        
+        case 2: return .thread(rootEventId: try FfiConverterString.read(from: &buf)
+        )
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: ReadReceiptThreadScope, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .main:
+            writeInt(&buf, Int32(1))
+        
+        
+        case let .thread(rootEventId):
+            writeInt(&buf, Int32(2))
+            FfiConverterString.write(rootEventId, into: &buf)
+            
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeReadReceiptThreadScope_lift(_ buf: RustBuffer) throws -> ReadReceiptThreadScope {
+    return try FfiConverterTypeReadReceiptThreadScope.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeReadReceiptThreadScope_lower(_ value: ReadReceiptThreadScope) -> RustBuffer {
+    return FfiConverterTypeReadReceiptThreadScope.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
  * A [`TimelineItem`](super::TimelineItem) that doesn't correspond to an event.
  */
@@ -51522,6 +51708,30 @@ fileprivate struct FfiConverterOptionTypeDuplicateOneTimeKeyErrorMessage: FfiCon
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeEventReadReceiptSummary: FfiConverterRustBuffer {
+    typealias SwiftType = EventReadReceiptSummary?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeEventReadReceiptSummary.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeEventReadReceiptSummary.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeEventTimelineItem: FfiConverterRustBuffer {
     typealias SwiftType = EventTimelineItem?
 
@@ -55996,6 +56206,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_latest_event() != 37006) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_latest_own_main_timeline_read_receipt_summary() != 61193) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_leave() != 3346) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -56054,6 +56267,9 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_raw_name() != 65346) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_read_receipt_summary_for_event() != 42737) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_redact() != 63919) {
