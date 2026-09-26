@@ -9473,6 +9473,54 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandle) async throws 
     
     /**
+     * Edit an MSC3381 poll directly and return the edit event's ID.
+     *
+     * Always pass the original poll start ID, including for successive edits,
+     * never a previous edit's ID. Retain the IDs of remaining answers. The SDK
+     * loads the target if necessary and checks its author and event type. The
+     * caller checks whether editing is allowed by the poll's current state;
+     * no responses or end events are fetched. Retries must reuse the payload
+     * and transaction ID. Normal SDK encryption applies and errors propagate.
+     * An empty transaction ID is rejected before any network requests.
+     */
+    func editPollWithTransactionIdReturningEventId(pollStartEventId: String, pollData: DirectPollData, transactionId: String) async throws  -> String
+    
+    /**
+     * End an MSC3381 poll directly and return the end event's ID.
+     *
+     * `poll_start_event_id` must identify the original poll start. `text` is
+     * the fallback text for clients without poll support. The caller checks
+     * the poll's state and permissions; no responses or end events are fetched.
+     * Retries must reuse the payload and transaction ID. Normal SDK encryption
+     * applies and send errors propagate. Success means server acceptance;
+     * the SDK's aggregation determines the resulting poll state.
+     * An empty transaction ID is rejected before any network requests.
+     */
+    func endPollWithTransactionIdReturningEventId(pollStartEventId: String, text: String, transactionId: String) async throws  -> String
+    
+    /**
+     * Send an MSC3381 vote directly and return the response event's ID.
+     *
+     * `poll_start_event_id` must identify the original poll start. Answer IDs
+     * must be nonempty and unique; an empty list is allowed to clear a vote.
+     * The caller checks the poll's current state and available answers. No
+     * responses or end events are fetched. Retries must reuse the payload and
+     * transaction ID. Normal SDK encryption applies and send errors propagate.
+     * An empty transaction ID is rejected before any network requests.
+     */
+    func sendPollResponseWithTransactionIdReturningEventId(pollStartEventId: String, answers: [String], transactionId: String) async throws  -> String
+    
+    /**
+     * Send an MSC3381 poll directly and return its server-assigned event ID.
+     *
+     * Uses normal SDK encryption and waits for the homeserver response without
+     * creating a timeline or enqueueing a local echo. Errors are returned to
+     * the caller. Retries must reuse both the transaction ID and poll data.
+     * An empty transaction ID is rejected before any network requests.
+     */
+    func sendPollStartWithTransactionIdReturningEventId(pollData: DirectPollData, transactionId: String) async throws  -> String
+    
+    /**
      * Search for messages in this room matching the given query, returning an
      * iterator over the results that yields `num_results_per_batch` results at
      * a time.
@@ -11788,6 +11836,114 @@ open func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandl
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Edit an MSC3381 poll directly and return the edit event's ID.
+     *
+     * Always pass the original poll start ID, including for successive edits,
+     * never a previous edit's ID. Retain the IDs of remaining answers. The SDK
+     * loads the target if necessary and checks its author and event type. The
+     * caller checks whether editing is allowed by the poll's current state;
+     * no responses or end events are fetched. Retries must reuse the payload
+     * and transaction ID. Normal SDK encryption applies and errors propagate.
+     * An empty transaction ID is rejected before any network requests.
+     */
+open func editPollWithTransactionIdReturningEventId(pollStartEventId: String, pollData: DirectPollData, transactionId: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_edit_poll_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(pollStartEventId),FfiConverterTypeDirectPollData_lower(pollData),FfiConverterString.lower(transactionId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * End an MSC3381 poll directly and return the end event's ID.
+     *
+     * `poll_start_event_id` must identify the original poll start. `text` is
+     * the fallback text for clients without poll support. The caller checks
+     * the poll's state and permissions; no responses or end events are fetched.
+     * Retries must reuse the payload and transaction ID. Normal SDK encryption
+     * applies and send errors propagate. Success means server acceptance;
+     * the SDK's aggregation determines the resulting poll state.
+     * An empty transaction ID is rejected before any network requests.
+     */
+open func endPollWithTransactionIdReturningEventId(pollStartEventId: String, text: String, transactionId: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_end_poll_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(pollStartEventId),FfiConverterString.lower(text),FfiConverterString.lower(transactionId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Send an MSC3381 vote directly and return the response event's ID.
+     *
+     * `poll_start_event_id` must identify the original poll start. Answer IDs
+     * must be nonempty and unique; an empty list is allowed to clear a vote.
+     * The caller checks the poll's current state and available answers. No
+     * responses or end events are fetched. Retries must reuse the payload and
+     * transaction ID. Normal SDK encryption applies and send errors propagate.
+     * An empty transaction ID is rejected before any network requests.
+     */
+open func sendPollResponseWithTransactionIdReturningEventId(pollStartEventId: String, answers: [String], transactionId: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_poll_response_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(pollStartEventId),FfiConverterSequenceString.lower(answers),FfiConverterString.lower(transactionId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Send an MSC3381 poll directly and return its server-assigned event ID.
+     *
+     * Uses normal SDK encryption and waits for the homeserver response without
+     * creating a timeline or enqueueing a local echo. Errors are returned to
+     * the caller. Retries must reuse both the transaction ID and poll data.
+     * An empty transaction ID is rejected before any network requests.
+     */
+open func sendPollStartWithTransactionIdReturningEventId(pollData: DirectPollData, transactionId: String)async throws  -> String  {
+    return
+        try  await uniffiRustCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_send_poll_start_with_transaction_id_returning_event_id(
+                    self.uniffiCloneHandle(),
+                    FfiConverterTypeDirectPollData_lower(pollData),FfiConverterString.lower(transactionId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: ffi_matrix_sdk_ffi_rust_future_free_rust_buffer,
+            liftFunc: FfiConverterString.lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -20394,6 +20550,88 @@ public func FfiConverterTypeDeviceInfo_lift(_ buf: RustBuffer) throws -> DeviceI
 #endif
 public func FfiConverterTypeDeviceInfo_lower(_ value: DeviceInfo) -> RustBuffer {
     return FfiConverterTypeDeviceInfo.lower(value)
+}
+
+
+/**
+ * Content for a direct poll start or edit, with caller-owned answer IDs.
+ *
+ * Persist this entire value and the transaction ID before sending. A retry
+ * must use the same values. When editing, retain IDs of existing answers and
+ * assign new IDs to newly added answers. The existing `PollData` API is
+ * unaffected.
+ */
+public struct DirectPollData: Equatable, Hashable {
+    public var question: String
+    /**
+     * Between 1 and 20 answers, with nonempty IDs unique within the poll.
+     */
+    public var answers: [PollAnswer]
+    /**
+     * Must be at least 1.
+     */
+    public var maxSelections: UInt8
+    public var pollKind: PollKind
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(question: String, 
+        /**
+         * Between 1 and 20 answers, with nonempty IDs unique within the poll.
+         */answers: [PollAnswer], 
+        /**
+         * Must be at least 1.
+         */maxSelections: UInt8, pollKind: PollKind) {
+        self.question = question
+        self.answers = answers
+        self.maxSelections = maxSelections
+        self.pollKind = pollKind
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension DirectPollData: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeDirectPollData: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> DirectPollData {
+        return
+            try DirectPollData(
+                question: FfiConverterString.read(from: &buf), 
+                answers: FfiConverterSequenceTypePollAnswer.read(from: &buf), 
+                maxSelections: FfiConverterUInt8.read(from: &buf), 
+                pollKind: FfiConverterTypePollKind.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: DirectPollData, into buf: inout [UInt8]) {
+        FfiConverterString.write(value.question, into: &buf)
+        FfiConverterSequenceTypePollAnswer.write(value.answers, into: &buf)
+        FfiConverterUInt8.write(value.maxSelections, into: &buf)
+        FfiConverterTypePollKind.write(value.pollKind, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDirectPollData_lift(_ buf: RustBuffer) throws -> DirectPollData {
+    return try FfiConverterTypeDirectPollData.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeDirectPollData_lower(_ value: DirectPollData) -> RustBuffer {
+    return FfiConverterTypeDirectPollData.lower(value)
 }
 
 
@@ -43313,7 +43551,9 @@ public enum TimelineFilter {
      */
     case all
     /**
-     * Show only `m.room.messages` of the given room message types.
+     * Show only `m.room.messages` of the given room message types. Encrypted
+     * events are retained until their message type can be determined; events
+     * that remain undecryptable remain in the timeline.
      */
     case onlyMessage(
         /**
@@ -56435,6 +56675,18 @@ private let initializationResult: InitializationResult = {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 13926) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_edit_poll_with_transaction_id_returning_event_id() != 38698) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_end_poll_with_transaction_id_returning_event_id() != 12324) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_poll_response_with_transaction_id_returning_event_id() != 33702) {
+        return InitializationResult.apiChecksumMismatch
+    }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_send_poll_start_with_transaction_id_returning_event_id() != 12100) {
         return InitializationResult.apiChecksumMismatch
     }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_search_messages() != 55573) {
