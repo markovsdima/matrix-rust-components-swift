@@ -9473,6 +9473,27 @@ public protocol RoomProtocol: AnyObject, Sendable {
     func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandle) async throws 
     
     /**
+     * Inspect an event using the cache first, then the homeserver if needed.
+     * Undecrypted message envelopes and cached message UTDs are retried with
+     * current SDK keys and trust settings. Already decrypted cache entries are
+     * returned without decrypting again or rechecking stricter trust settings.
+     * Neither fetched nor decrypted results are written to the event cache.
+     * Lookup and identity errors are returned to the caller.
+     *
+     * No timeline is created, focused, or paginated. `Visible` means eligible
+     * under the SDK's default policy; edits, reactions, and poll results are
+     * not aggregated. Unknown or malformed events are never classified hidden.
+     * Custom application filters may exclude a `Visible` event indefinitely.
+     * Encrypted state events are not decrypted by this API yet: unresolved
+     * envelopes are `Indeterminate`, while established SDK UTDs remain UTDs.
+     *
+     * Normal UniFFI cancellation stops this call and its owned work. Shared
+     * SDK key recovery already triggered by decryption may continue. No chat
+     * messages, redactions, read receipts, or typing events are sent.
+     */
+    func inspectTimelineEvent(eventId: String) async throws  -> RoomTimelineEventInspection
+    
+    /**
      * Edit an MSC3381 poll directly and return the edit event's ID.
      *
      * Always pass the original poll start ID, including for successive edits,
@@ -11836,6 +11857,43 @@ open func withdrawVerificationAndResend(userIds: [String], sendHandle: SendHandl
             completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_void,
             freeFunc: ffi_matrix_sdk_ffi_rust_future_free_void,
             liftFunc: { $0 },
+            errorHandler: FfiConverterTypeClientError_lift
+        )
+}
+    
+    /**
+     * Inspect an event using the cache first, then the homeserver if needed.
+     * Undecrypted message envelopes and cached message UTDs are retried with
+     * current SDK keys and trust settings. Already decrypted cache entries are
+     * returned without decrypting again or rechecking stricter trust settings.
+     * Neither fetched nor decrypted results are written to the event cache.
+     * Lookup and identity errors are returned to the caller.
+     *
+     * No timeline is created, focused, or paginated. `Visible` means eligible
+     * under the SDK's default policy; edits, reactions, and poll results are
+     * not aggregated. Unknown or malformed events are never classified hidden.
+     * Custom application filters may exclude a `Visible` event indefinitely.
+     * Encrypted state events are not decrypted by this API yet: unresolved
+     * envelopes are `Indeterminate`, while established SDK UTDs remain UTDs.
+     *
+     * Normal UniFFI cancellation stops this call and its owned work. Shared
+     * SDK key recovery already triggered by decryption may continue. No chat
+     * messages, redactions, read receipts, or typing events are sent.
+     */
+open func inspectTimelineEvent(eventId: String)async throws  -> RoomTimelineEventInspection  {
+    return
+        try  await uniffiInspectionCallAsync(
+            rustFutureFunc: {
+                uniffi_matrix_sdk_ffi_fn_method_room_inspect_timeline_event(
+                    self.uniffiCloneHandle(),
+                    FfiConverterString.lower(eventId)
+                )
+            },
+            pollFunc: ffi_matrix_sdk_ffi_rust_future_poll_rust_buffer,
+            completeFunc: ffi_matrix_sdk_ffi_rust_future_complete_rust_buffer,
+            freeFunc: { ffi_matrix_sdk_ffi_rust_future_free_rust_buffer($0) },
+            cancelFunc: { ffi_matrix_sdk_ffi_rust_future_cancel_rust_buffer($0) },
+            liftFunc: FfiConverterTypeRoomTimelineEventInspection_lift,
             errorHandler: FfiConverterTypeClientError_lift
         )
 }
@@ -25959,6 +26017,80 @@ public func FfiConverterTypeRoomSearchResult_lift(_ buf: RustBuffer) throws -> R
 #endif
 public func FfiConverterTypeRoomSearchResult_lower(_ value: RoomSearchResult) -> RustBuffer {
     return FfiConverterTypeRoomSearchResult.lower(value)
+}
+
+
+public struct RoomTimelineEventInspection: Equatable, Hashable {
+    /**
+     * The requested event, with complete raw JSON and original identity.
+     * Decrypted JSON is sensitive account data and must not be logged.
+     */
+    public var event: RawRoomEvent
+    public var disposition: RoomTimelineEventDisposition
+    /**
+     * Present exactly when disposition is `UnableToDecrypt`. Uses the same
+     * cause classification as the SDK timeline, including trust failures.
+     */
+    public var decryptionFailure: EncryptedMessage?
+
+    // Default memberwise initializers are never public by default, so we
+    // declare one manually.
+    public init(
+        /**
+         * The requested event, with complete raw JSON and original identity.
+         * Decrypted JSON is sensitive account data and must not be logged.
+         */event: RawRoomEvent, disposition: RoomTimelineEventDisposition, 
+        /**
+         * Present exactly when disposition is `UnableToDecrypt`. Uses the same
+         * cause classification as the SDK timeline, including trust failures.
+         */decryptionFailure: EncryptedMessage?) {
+        self.event = event
+        self.disposition = disposition
+        self.decryptionFailure = decryptionFailure
+    }
+
+    
+
+    
+}
+
+#if compiler(>=6)
+extension RoomTimelineEventInspection: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomTimelineEventInspection: FfiConverterRustBuffer {
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomTimelineEventInspection {
+        return
+            try RoomTimelineEventInspection(
+                event: FfiConverterTypeRawRoomEvent.read(from: &buf), 
+                disposition: FfiConverterTypeRoomTimelineEventDisposition.read(from: &buf), 
+                decryptionFailure: FfiConverterOptionTypeEncryptedMessage.read(from: &buf)
+        )
+    }
+
+    public static func write(_ value: RoomTimelineEventInspection, into buf: inout [UInt8]) {
+        FfiConverterTypeRawRoomEvent.write(value.event, into: &buf)
+        FfiConverterTypeRoomTimelineEventDisposition.write(value.disposition, into: &buf)
+        FfiConverterOptionTypeEncryptedMessage.write(value.decryptionFailure, into: &buf)
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomTimelineEventInspection_lift(_ buf: RustBuffer) throws -> RoomTimelineEventInspection {
+    return try FfiConverterTypeRoomTimelineEventInspection.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomTimelineEventInspection_lower(_ value: RoomTimelineEventInspection) -> RustBuffer {
+    return FfiConverterTypeRoomTimelineEventInspection.lower(value)
 }
 
 
@@ -40822,6 +40954,102 @@ public func FfiConverterTypeRoomSendQueueUpdate_lower(_ value: RoomSendQueueUpda
 
 // Note that we don't yet support `indirect` for enums.
 // See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
+
+public enum RoomTimelineEventDisposition: Equatable, Hashable {
+    
+    /**
+     * Eligible as a standalone item under the SDK's default policy, including
+     * thread replies. This is not an aggregated timeline item and does not
+     * imply inclusion under an application's custom timeline filter.
+     */
+    case visible
+    /**
+     * A recognized event excluded as a standalone item by the SDK's policy.
+     */
+    case hidden
+    /**
+     * The SDK established a decryption failure, even if its cause is unknown.
+     */
+    case unableToDecrypt
+    /**
+     * Insufficient information, malformed content, or an unsupported type.
+     * This must never be interpreted as permission to remove retained history.
+     */
+    case indeterminate
+
+
+
+
+
+}
+
+#if compiler(>=6)
+extension RoomTimelineEventDisposition: Sendable {}
+#endif
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public struct FfiConverterTypeRoomTimelineEventDisposition: FfiConverterRustBuffer {
+    typealias SwiftType = RoomTimelineEventDisposition
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> RoomTimelineEventDisposition {
+        let variant: Int32 = try readInt(&buf)
+        switch variant {
+        
+        case 1: return .visible
+        
+        case 2: return .hidden
+        
+        case 3: return .unableToDecrypt
+        
+        case 4: return .indeterminate
+        
+        default: throw UniffiInternalError.unexpectedEnumCase
+        }
+    }
+
+    public static func write(_ value: RoomTimelineEventDisposition, into buf: inout [UInt8]) {
+        switch value {
+        
+        
+        case .visible:
+            writeInt(&buf, Int32(1))
+        
+        
+        case .hidden:
+            writeInt(&buf, Int32(2))
+        
+        
+        case .unableToDecrypt:
+            writeInt(&buf, Int32(3))
+        
+        
+        case .indeterminate:
+            writeInt(&buf, Int32(4))
+        
+        }
+    }
+}
+
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomTimelineEventDisposition_lift(_ buf: RustBuffer) throws -> RoomTimelineEventDisposition {
+    return try FfiConverterTypeRoomTimelineEventDisposition.lift(buf)
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
+public func FfiConverterTypeRoomTimelineEventDisposition_lower(_ value: RoomTimelineEventDisposition) -> RustBuffer {
+    return FfiConverterTypeRoomTimelineEventDisposition.lower(value)
+}
+
+
+// Note that we don't yet support `indirect` for enums.
+// See https://github.com/mozilla/uniffi-rs/issues/396 for further discussion.
 /**
  * The type of room for a [`RoomPreviewInfo`].
  */
@@ -52716,6 +52944,30 @@ fileprivate struct FfiConverterOptionTypeAuthData: FfiConverterRustBuffer {
 #if swift(>=5.8)
 @_documentation(visibility: private)
 #endif
+fileprivate struct FfiConverterOptionTypeEncryptedMessage: FfiConverterRustBuffer {
+    typealias SwiftType = EncryptedMessage?
+
+    public static func write(_ value: SwiftType, into buf: inout [UInt8]) {
+        guard let value = value else {
+            writeInt(&buf, Int8(0))
+            return
+        }
+        writeInt(&buf, Int8(1))
+        FfiConverterTypeEncryptedMessage.write(value, into: &buf)
+    }
+
+    public static func read(from buf: inout (data: Data, offset: Data.Index)) throws -> SwiftType {
+        switch try readInt(&buf) as Int8 {
+        case 0: return nil
+        case 1: return try FfiConverterTypeEncryptedMessage.read(from: &buf)
+        default: throw UniffiInternalError.unexpectedOptionalTag
+        }
+    }
+}
+
+#if swift(>=5.8)
+@_documentation(visibility: private)
+#endif
 fileprivate struct FfiConverterOptionTypeEventSendState: FfiConverterRustBuffer {
     typealias SwiftType = EventSendState?
 
@@ -56677,6 +56929,9 @@ private let initializationResult: InitializationResult = {
     if (uniffi_matrix_sdk_ffi_checksum_method_room_withdraw_verification_and_resend() != 13926) {
         return InitializationResult.apiChecksumMismatch
     }
+    if (uniffi_matrix_sdk_ffi_checksum_method_room_inspect_timeline_event() != 7651) {
+        return InitializationResult.apiChecksumMismatch
+    }
     if (uniffi_matrix_sdk_ffi_checksum_method_room_edit_poll_with_transaction_id_returning_event_id() != 38698) {
         return InitializationResult.apiChecksumMismatch
     }
@@ -57461,3 +57716,112 @@ public func uniffiEnsureMatrixSdkFfiInitialized() {
 }
 
 // swiftlint:enable all
+// Inspection-specific cancellation bridge for UniFFI 0.31.
+// Uses UniFFI's standard rust_future_cancel/complete/free protocol. Other async SDK
+// methods retain their generated behavior. Remove when the generator supports
+// native Swift task cancellation and the linked cancellation tests pass.
+
+fileprivate final class UniffiInspectionFuture: @unchecked Sendable {
+    private let lock = NSLock()
+    private var handle: UInt64?
+    private var completing = false
+    private let cancelFunc: @Sendable (UInt64) -> Void
+    private let freeFunc: @Sendable (UInt64) -> Void
+
+    init(handle: UInt64, cancelFunc: @escaping @Sendable (UInt64) -> Void,
+         freeFunc: @escaping @Sendable (UInt64) -> Void) {
+        self.handle = handle
+        self.cancelFunc = cancelFunc
+        self.freeFunc = freeFunc
+    }
+
+    func cancel() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let handle, !completing else { return }
+        cancelFunc(handle)
+    }
+
+    func complete<T>(_ body: () -> T) -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        // Complete even after cancellation: a ready result/error owns a lowered
+        // RustBuffer that rust_future_free alone does not destroy in UniFFI 0.31.
+        // Serialize completion with cancellation, then handle the buffers below.
+        completing = true
+        return body()
+    }
+
+    func free() {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let handle else { return }
+        self.handle = nil
+        // Serialize with cancel so that it can never use a freed Rust handle.
+        freeFunc(handle)
+    }
+}
+
+fileprivate func uniffiInspectionCallAsync<T>(
+    rustFutureFunc: () -> UInt64,
+    pollFunc: (UInt64, @escaping UniffiRustFutureContinuationCallback, UInt64) -> Void,
+    completeFunc: (UInt64, UnsafeMutablePointer<RustCallStatus>) -> RustBuffer,
+    freeFunc: @escaping @Sendable (UInt64) -> Void,
+    cancelFunc: @escaping @Sendable (UInt64) -> Void,
+    liftFunc: (RustBuffer) throws -> T,
+    errorHandler: ((RustBuffer) throws -> Swift.Error)?
+) async throws -> T {
+    try Task.checkCancellation()
+    uniffiEnsureMatrixSdkFfiInitialized()
+    let handle = rustFutureFunc()
+    let future = UniffiInspectionFuture(handle: handle, cancelFunc: cancelFunc, freeFunc: freeFunc)
+    defer { future.free() }
+
+    return try await withTaskCancellationHandler {
+        var ready = false
+        while !ready {
+            let result = await withUnsafeContinuation { continuation in
+                pollFunc(handle, { handle, result in
+                    uniffiFutureContinuationCallback(handle: handle, pollResult: result)
+                }, uniffiContinuationHandleMap.insert(obj: continuation))
+            }
+            ready = result == UNIFFI_RUST_FUTURE_POLL_READY
+        }
+        let (buffer, status) = future.complete {
+            var status = RustCallStatus()
+            let buffer = completeFunc(handle, &status)
+            return (buffer, status)
+        }
+        if Task.isCancelled || status.code == CALL_CANCELLED {
+            // Cancellation may race a successful result, a typed SDK error, or
+            // a panic. Release both buffer slots before discarding the outcome.
+            // Do not pass CALL_CANCELLED to UniFFI's Swift status checker: it
+            // calls fatalError because its default helper has no cancellation.
+            buffer.deallocate()
+            status.errorBuf.deallocate()
+            throw CancellationError()
+        }
+        if status.code != CALL_SUCCESS {
+            // Error results return an empty/default value buffer. The status
+            // checker consumes the error buffer, including typed errors/panics.
+            buffer.deallocate()
+        }
+        do {
+            try uniffiCheckCallStatus(callStatus: status, errorHandler: errorHandler)
+            let result = try liftFunc(buffer)
+            try Task.checkCancellation()
+            return result
+        } catch {
+            // Conversion has already consumed its buffer. Prefer cancellation
+            // if it arrived while converting a result or an SDK error.
+            try Task.checkCancellation()
+            throw error
+        }
+    } onCancel: {
+        // Swift invokes this handler while holding a task status lock. UniFFI
+        // can hold its scheduler lock while resuming a Swift continuation.
+        // Calling into Rust here would invert those locks during a wake/cancel
+        // race. The handle guard also makes a late queued cancellation safe.
+        DispatchQueue.global().async { future.cancel() }
+    }
+}
